@@ -10,11 +10,14 @@ Convertisseur de fichiers audio, vidéo et image — interface graphique Windows
 
 Toutes les conversions sont bidirectionnelles.
 
-## Lancer l'app
+## Télécharger
 
-**Sans installation** — télécharge `MediaConverter.exe` dans [Releases](../../releases) et double-clique.
+👉 [Releases](../../releases) — télécharge `MediaConverter_Setup_v1.1.0.exe` et lance l'installeur.
 
-> ffmpeg doit être installé : `winget install --id Gyan.FFmpeg --source winget`
+> **Prérequis :** ffmpeg doit être installé sur le système.
+> ```powershell
+> winget install --id Gyan.FFmpeg --source winget
+> ```
 
 ## Lancer depuis le code source
 
@@ -23,8 +26,12 @@ pip install -r requirements.txt
 python converter.py
 ```
 
-## Reconstruire l'exe
+## Construire l'installeur depuis les sources
 
 ```powershell
-python -m PyInstaller MediaConverter.spec
+# Clic droit sur build.ps1 > "Executer avec PowerShell"
+# ou :
+powershell -ExecutionPolicy Bypass -File build.ps1
 ```
+
+Le script installe les dépendances, génère l'exe via PyInstaller, puis compile l'installeur Inno Setup. Le résultat est dans `installer\`.
