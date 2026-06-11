@@ -23,7 +23,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Créer un raccourci sur le Bureau"; GroupDescription: "Raccourcis supplémentaires :"; Flags: unchecked
 
 [Files]
-Source: "dist\MediaConverter.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\MediaConverter\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Media Converter"; Filename: "{app}\MediaConverter.exe"
