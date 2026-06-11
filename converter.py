@@ -1,9 +1,29 @@
 import shutil
 import os
+import subprocess
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pydub import AudioSegment
+
+
+AUDIO_FORMATS = {"mp3", "wav", "flac"}
+VIDEO_FORMATS = {"mp4", "avi", "mov"}
+IMAGE_FORMATS = {"heic", "jpg", "jpeg", "png"}
+
+COMPATIBLE = {
+    "mp3":  ["flac", "wav"],
+    "wav":  ["flac", "mp3"],
+    "flac": ["mp3", "wav"],
+    "mp4":  ["avi", "mov"],
+    "avi":  ["mov", "mp4"],
+    "mov":  ["avi", "mp4"],
+    "heic": ["jpg", "png"],
+    "jpg":  ["heic", "png"],
+    "png":  ["heic", "jpg"],
+}
+
+ALL_FORMATS = sorted(COMPATIBLE.keys())
 
 
 class ConversionEngine:
@@ -12,9 +32,52 @@ class ConversionEngine:
         return shutil.which("ffmpeg") is not None
 
     def convert_file(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
+        ext = os.path.splitext(input_path)[1].lower().lstrip(".")
+        if ext in AUDIO_FORMATS:
+            return self._convert_audio(input_path, output_path, target_format)
+        elif ext in VIDEO_FORMATS:
+            return self._convert_video(input_path, output_path, target_format)
+        elif ext in IMAGE_FORMATS:
+            return self._convert_image(input_path, output_path, target_format)
+        return False, f"Format source non supporté : .{ext}"
+
+    def _convert_audio(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
         try:
             audio = AudioSegment.from_file(input_path)
             audio.export(output_path, format=target_format)
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+    def _convert_video(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", input_path, output_path],
+                capture_output=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr.decode(errors="replace")
+                lines = [l for l in stderr.splitlines() if l.strip()]
+                return False, lines[-1] if lines else "Erreur ffmpeg inconnue"
+            return True, ""
+        except subprocess.TimeoutExpired:
+            return False, "Timeout dépassé (> 1h)"
+        except Exception as e:
+            return False, str(e)
+
+    def _convert_image(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+            from PIL import Image
+
+            img = Image.open(input_path)
+            fmt_map = {"jpg": "JPEG", "jpeg": "JPEG", "png": "PNG", "heic": "HEIF"}
+            save_format = fmt_map.get(target_format.lower(), target_format.upper())
+            if save_format == "JPEG" and img.mode in ("RGBA", "P", "LA"):
+                img = img.convert("RGB")
+            img.save(output_path, format=save_format)
             return True, ""
         except Exception as e:
             return False, str(e)
@@ -24,15 +87,17 @@ class AppUI:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Audio Converter — MP3 ↔ WAV")
-        self.root.geometry("700x500")
+        self.root.title("Media Converter")
+        self.root.geometry("760x520")
         self.root.resizable(True, True)
-        self.root.minsize(600, 400)
+        self.root.minsize(640, 420)
 
         self.engine = ConversionEngine()
         self.files: list[dict] = []
         self.output_dir: str | None = None
-        self.direction = tk.StringVar(value="mp3_to_wav")
+
+        self.source_fmt = tk.StringVar(value="mp3")
+        self.target_fmt = tk.StringVar(value="wav")
 
         self._check_ffmpeg_on_start()
         self._build_ui()
@@ -43,31 +108,41 @@ class AppUI:
                 "ffmpeg introuvable",
                 "ffmpeg n'est pas détecté dans votre PATH.\n\n"
                 "Installation Windows :\n"
-                "1. Télécharger depuis https://ffmpeg.org/download.html\n"
-                "2. Extraire l'archive\n"
-                "3. Ajouter le dossier 'bin' au PATH système\n"
-                "4. Redémarrer l'application"
+                "  winget install --id Gyan.FFmpeg --source winget\n\n"
+                "Redémarrez l'application après installation."
             )
 
     def _build_ui(self):
-        # Direction selector
-        dir_frame = ttk.LabelFrame(self.root, text="Direction de conversion", padding=8)
-        dir_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+        # Format selector
+        fmt_frame = ttk.LabelFrame(self.root, text="Conversion", padding=10)
+        fmt_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
 
-        ttk.Radiobutton(dir_frame, text="MP3 → WAV", variable=self.direction,
-                        value="mp3_to_wav", command=self._on_direction_change).pack(side=tk.LEFT, padx=10)
-        ttk.Radiobutton(dir_frame, text="WAV → MP3", variable=self.direction,
-                        value="wav_to_mp3", command=self._on_direction_change).pack(side=tk.LEFT, padx=10)
+        ttk.Label(fmt_frame, text="Source :").pack(side=tk.LEFT)
+        self._src_combo = ttk.Combobox(
+            fmt_frame, textvariable=self.source_fmt,
+            values=ALL_FORMATS, state="readonly", width=8
+        )
+        self._src_combo.pack(side=tk.LEFT, padx=(4, 10))
+        self._src_combo.bind("<<ComboboxSelected>>", self._on_source_change)
+
+        ttk.Label(fmt_frame, text="→").pack(side=tk.LEFT)
+
+        self._tgt_combo = ttk.Combobox(
+            fmt_frame, textvariable=self.target_fmt,
+            state="readonly", width=8
+        )
+        self._tgt_combo.pack(side=tk.LEFT, padx=(10, 0))
+        self._refresh_target_formats()
 
         # Action buttons
-        buttons_frame = ttk.Frame(self.root)
-        buttons_frame.pack(fill=tk.X, padx=10, pady=8)
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.pack(fill=tk.X, padx=10, pady=8)
 
-        ttk.Button(buttons_frame, text="Ajouter des fichiers",
+        ttk.Button(btn_frame, text="Ajouter des fichiers",
                    command=self._add_files).pack(side=tk.LEFT, padx=(0, 6))
-        ttk.Button(buttons_frame, text="Ajouter un dossier",
+        ttk.Button(btn_frame, text="Ajouter un dossier",
                    command=self._add_folder).pack(side=tk.LEFT, padx=(0, 6))
-        ttk.Button(buttons_frame, text="Vider la liste",
+        ttk.Button(btn_frame, text="Vider la liste",
                    command=self._clear_list).pack(side=tk.LEFT)
 
         # File list
@@ -80,8 +155,8 @@ class AppUI:
         self._tree.heading("path", text="Chemin")
         self._tree.heading("status", text="Statut")
         self._tree.column("name", width=180, anchor=tk.W)
-        self._tree.column("path", width=320, anchor=tk.W)
-        self._tree.column("status", width=150, anchor=tk.W)
+        self._tree.column("path", width=330, anchor=tk.W)
+        self._tree.column("status", width=160, anchor=tk.W)
 
         self._tree.tag_configure("done", foreground="green")
         self._tree.tag_configure("error", foreground="red")
@@ -98,9 +173,9 @@ class AppUI:
 
         ttk.Button(out_frame, text="Choisir le dossier de sortie",
                    command=self._choose_output_dir).pack(side=tk.LEFT, padx=(0, 8))
-        self._output_label = ttk.Label(out_frame,
-                                       text="Dossier de sortie : (même dossier que la source)",
-                                       foreground="gray")
+        self._output_label = ttk.Label(
+            out_frame, text="Dossier de sortie : (même dossier que la source)", foreground="gray"
+        )
         self._output_label.pack(side=tk.LEFT)
 
         # Progress bar
@@ -108,32 +183,37 @@ class AppUI:
         self._progress.pack(fill=tk.X, padx=10, pady=(0, 4))
 
         # Bottom bar
-        bottom_frame = ttk.Frame(self.root)
-        bottom_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        bottom = ttk.Frame(self.root)
+        bottom.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        self._convert_btn = ttk.Button(bottom_frame, text="Convertir",
-                                       command=self._start_conversion)
+        self._convert_btn = ttk.Button(bottom, text="Convertir", command=self._start_conversion)
         self._convert_btn.pack(side=tk.RIGHT)
 
-    # --- Direction ---
+    # --- Format management ---
 
-    def _on_direction_change(self):
-        self.files.clear()
-        for item in self._tree.get_children():
-            self._tree.delete(item)
+    def _refresh_target_formats(self):
+        src = self.source_fmt.get()
+        targets = COMPATIBLE.get(src, [])
+        self._tgt_combo["values"] = targets
+        if targets:
+            self.target_fmt.set(targets[0])
+
+    def _on_source_change(self, _event=None):
+        self._refresh_target_formats()
+        self._clear_list()
 
     def _source_format(self) -> str:
-        return "mp3" if self.direction.get() == "mp3_to_wav" else "wav"
+        return self.source_fmt.get()
 
     def _target_format(self) -> str:
-        return "wav" if self.direction.get() == "mp3_to_wav" else "mp3"
+        return self.target_fmt.get()
 
     # --- File management ---
 
     def _add_files(self):
         fmt = self._source_format()
         paths = filedialog.askopenfilenames(
-            title=f"Sélectionner des fichiers {fmt.upper()}",
+            title=f"Sélectionner des fichiers .{fmt.upper()}",
             filetypes=[(f"Fichiers {fmt.upper()}", f"*.{fmt}"), ("Tous les fichiers", "*.*")]
         )
         self._enqueue_paths(paths)
@@ -191,30 +271,28 @@ class AppUI:
         if not self.files:
             messagebox.showinfo("Aucun fichier", "Ajoutez des fichiers avant de convertir.")
             return
-
         if self.output_dir and not os.path.isdir(self.output_dir):
             messagebox.showerror("Dossier invalide",
                                  f"Le dossier de sortie n'existe pas :\n{self.output_dir}")
             return
 
         self._convert_btn.config(state=tk.DISABLED)
+        self._src_combo.config(state=tk.DISABLED)
+        self._tgt_combo.config(state=tk.DISABLED)
         self._progress["value"] = 0
         self._progress["maximum"] = len(self.files)
 
-        thread = threading.Thread(target=self._run_conversion, daemon=True)
-        thread.start()
+        threading.Thread(target=self._run_conversion, daemon=True).start()
 
     def _run_conversion(self):
+        target = self._target_format()
         for i, entry in enumerate(self.files):
             self.root.after(0, self._set_status, entry, "En cours...")
             output_path = self._resolve_output_path(entry["path"])
-            success, error = self.engine.convert_file(entry["path"], output_path, self._target_format())
-            if success:
-                self.root.after(0, self._set_status, entry, "Terminé ✓")
-            else:
-                self.root.after(0, self._set_status, entry, f"Erreur ✗ — {error[:60]}")
+            success, error = self.engine.convert_file(entry["path"], output_path, target)
+            status = "Terminé ✓" if success else f"Erreur ✗ — {error[:55]}"
+            self.root.after(0, self._set_status, entry, status)
             self.root.after(0, self._update_progress, i + 1)
-
         self.root.after(0, self._on_conversion_done)
 
     def _set_status(self, entry: dict, status: str):
@@ -235,11 +313,12 @@ class AppUI:
 
     def _on_conversion_done(self):
         self._convert_btn.config(state=tk.NORMAL)
+        self._src_combo.config(state="readonly")
+        self._tgt_combo.config(state="readonly")
         done = sum(1 for f in self.files if f["status"] == "Terminé ✓")
         errors = sum(1 for f in self.files if f["status"].startswith("Erreur"))
         messagebox.showinfo("Conversion terminée",
-                            f"{done} fichier(s) converti(s) avec succès.\n"
-                            f"{errors} erreur(s).")
+                            f"{done} fichier(s) converti(s) avec succès.\n{errors} erreur(s).")
 
 
 if __name__ == "__main__":
