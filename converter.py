@@ -44,15 +44,26 @@ class ConversionEngine:
     def _convert_audio(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
         try:
             audio = AudioSegment.from_file(input_path)
-            audio.export(output_path, format=target_format)
+            export_kwargs: dict = {"format": target_format}
+            if target_format == "mp3":
+                export_kwargs["bitrate"] = "320k"
+            audio.export(output_path, **export_kwargs)
             return True, ""
         except Exception as e:
             return False, str(e)
 
+    # High-quality ffmpeg flags per output format
+    _VIDEO_FLAGS = {
+        "mp4": ["-c:v", "libx264", "-crf", "16", "-preset", "slow", "-c:a", "aac", "-b:a", "320k"],
+        "mov": ["-c:v", "libx264", "-crf", "16", "-preset", "slow", "-c:a", "aac", "-b:a", "320k"],
+        "avi": ["-c:v", "mpeg4", "-q:v", "2", "-c:a", "libmp3lame", "-b:a", "320k"],
+    }
+
     def _convert_video(self, input_path: str, output_path: str, target_format: str) -> tuple[bool, str]:
         try:
+            flags = self._VIDEO_FLAGS.get(target_format, [])
             result = subprocess.run(
-                ["ffmpeg", "-y", "-i", input_path, output_path],
+                ["ffmpeg", "-y", "-i", input_path] + flags + [output_path],
                 capture_output=True,
                 timeout=3600,
             )
@@ -77,7 +88,13 @@ class ConversionEngine:
             save_format = fmt_map.get(target_format.lower(), target_format.upper())
             if save_format == "JPEG" and img.mode in ("RGBA", "P", "LA"):
                 img = img.convert("RGB")
-            img.save(output_path, format=save_format)
+            save_kwargs: dict = {"format": save_format}
+            if save_format == "JPEG":
+                save_kwargs["quality"] = 97
+                save_kwargs["subsampling"] = 0  # 4:4:4 — aucune perte de chrominance
+            elif save_format == "HEIF":
+                save_kwargs["quality"] = 95
+            img.save(output_path, **save_kwargs)
             return True, ""
         except Exception as e:
             return False, str(e)
