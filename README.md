@@ -28,10 +28,4 @@ python converter.py
 
 ## Construire l'installeur depuis les sources
 
-```powershell
-# Clic droit sur build.ps1 > "Executer avec PowerShell"
-# ou :
-powershell -ExecutionPolicy Bypass -File build.ps1
-```
-
-Le script installe les dépendances, génère l'exe via PyInstaller, puis compile l'installeur Inno Setup. Le résultat est dans `installer\`.
+Double-clique sur **`build.bat`** — le script installe les dépendances, génère l'exe et compile l'installeur. Le résultat est dans `installer\`.
