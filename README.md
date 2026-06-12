@@ -12,7 +12,7 @@ Toutes les conversions sont bidirectionnelles.
 
 ## Télécharger
 
-👉 [Releases](../../releases) — télécharge `MediaConverter_Setup_v1.1.0.exe` et lance l'installeur.
+👉 [Releases](../../releases) — télécharge `MediaConverter_Setup_v1.2.0.exe` et lance l'installeur.
 
 > **Prérequis :** ffmpeg doit être installé sur le système.
 > ```powershell

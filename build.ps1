@@ -36,7 +36,7 @@ Step "Compilation de l'installeur..."
 New-Item -ItemType Directory -Force -Path installer | Out-Null
 & $iscc installer.iss
 
-$setup = "installer\MediaConverter_Setup_v1.1.0.exe"
+$setup = "installer\MediaConverter_Setup_v1.2.0.exe"
 if (Test-Path $setup) {
     $size = [math]::Round((Get-Item $setup).Length / 1MB, 1)
     Write-Host "`nSUCCES : $setup ($size MB)" -ForegroundColor Green

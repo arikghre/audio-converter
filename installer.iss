@@ -1,6 +1,6 @@
 [Setup]
 AppName=Media Converter
-AppVersion=1.1.0
+AppVersion=1.2.0
 AppPublisher=arikghre
 AppPublisherURL=https://github.com/arikghre/audio-converter
 AppSupportURL=https://github.com/arikghre/audio-converter/issues
@@ -9,7 +9,7 @@ DefaultDirName={autopf}\MediaConverter
 DefaultGroupName=Media Converter
 AllowNoIcons=yes
 OutputDir=installer
-OutputBaseFilename=MediaConverter_Setup_v1.1.0
+OutputBaseFilename=MediaConverter_Setup_v1.2.0
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
