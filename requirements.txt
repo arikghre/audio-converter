@@ -1,3 +1,0 @@
-pydub
-Pillow
-pillow-heif
