@@ -20,17 +20,13 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='MediaConverter',
+    name='AGsMediaConverter',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
+    icon='logo.ico',
 )
 
 coll = COLLECT(
@@ -39,6 +35,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    upx_exclude=[],
-    name='MediaConverter',
+    name='AGsMediaConverter',
 )

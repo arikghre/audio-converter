@@ -104,7 +104,7 @@ class AppUI:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Media Converter")
+        self.root.title("AG's Media Converter")
         self.root.geometry("760x520")
         self.root.resizable(True, True)
         self.root.minsize(640, 420)
