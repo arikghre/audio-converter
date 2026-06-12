@@ -28,4 +28,4 @@ python converter.py
 
 ## Construire l'installeur depuis les sources
 
-Double-clique sur **`build.bat`** — le script installe les dépendances, génère l'exe et compile l'installeur. Le résultat est dans `installer\`.
+Double-clique sur **`build.exe`** — installe les dépendances, génère l'exe et compile l'installeur. Le résultat est dans `installer\`.
